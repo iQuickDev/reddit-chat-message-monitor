@@ -157,6 +157,23 @@ async function openReddit() {
         await new Promise(resolve => setTimeout(resolve, 5000));
     }
     
+    // Create state directory
+    const stateDir = path.join(__dirname, 'state');
+    if (!fs.existsSync(stateDir)) {
+        fs.mkdirSync(stateDir);
+    }
+    
+    // Start screenshot capture
+    setInterval(async () => {
+        try {
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const screenshot = await driver.takeScreenshot();
+            fs.writeFileSync(path.join(stateDir, `${timestamp}.png`), screenshot, 'base64');
+        } catch (error) {
+            console.error('Screenshot error:', error.message);
+        }
+    }, 30000);
+    
     await monitorMessages(driver, db);
     
     // await driver.quit();
