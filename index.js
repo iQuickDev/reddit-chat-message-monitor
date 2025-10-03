@@ -13,25 +13,56 @@ async function monitorMessages(driver, db) {
         console.log('Starting message check...');
         try {
             const messages = await driver.executeScript(`
-                const timeline = document.querySelector("body > faceplate-app > rs-app")?.shadowRoot
-                    ?.querySelector("div.rs-app-container > div > rs-page-overlay-manager > rs-room")?.shadowRoot
-                    ?.querySelector("main > rs-timeline")?.shadowRoot
-                    ?.querySelector("div > rs-virtual-scroll-dynamic")?.shadowRoot
-                    ?.querySelectorAll("rs-timeline-event");
+                const app = document.querySelector("body > faceplate-app > rs-app");
+                console.log('App element:', !!app);
+                if (!app) return { debug: 'No app element', messages: [] };
                 
-                if (!timeline) return [];
+                const appShadow = app.shadowRoot;
+                console.log('App shadow:', !!appShadow);
+                if (!appShadow) return { debug: 'No app shadow', messages: [] };
                 
-                return Array.from(timeline).map(event => {
+                const room = appShadow.querySelector("div.rs-app-container > div > rs-page-overlay-manager > rs-room");
+                console.log('Room element:', !!room);
+                if (!room) return { debug: 'No room element', messages: [] };
+                
+                const roomShadow = room.shadowRoot;
+                console.log('Room shadow:', !!roomShadow);
+                if (!roomShadow) return { debug: 'No room shadow', messages: [] };
+                
+                const timeline = roomShadow.querySelector("main > rs-timeline");
+                console.log('Timeline element:', !!timeline);
+                if (!timeline) return { debug: 'No timeline element', messages: [] };
+                
+                const timelineShadow = timeline.shadowRoot;
+                console.log('Timeline shadow:', !!timelineShadow);
+                if (!timelineShadow) return { debug: 'No timeline shadow', messages: [] };
+                
+                const virtualScroll = timelineShadow.querySelector("div > rs-virtual-scroll-dynamic");
+                console.log('Virtual scroll element:', !!virtualScroll);
+                if (!virtualScroll) return { debug: 'No virtual scroll element', messages: [] };
+                
+                const virtualScrollShadow = virtualScroll.shadowRoot;
+                console.log('Virtual scroll shadow:', !!virtualScrollShadow);
+                if (!virtualScrollShadow) return { debug: 'No virtual scroll shadow', messages: [] };
+                
+                const events = virtualScrollShadow.querySelectorAll("rs-timeline-event");
+                console.log('Timeline events found:', events.length);
+                
+                const messages = Array.from(events).map(event => {
                     const dataId = event.getAttribute('data-id');
                     const username = event.shadowRoot?.querySelector('rs-username')?.textContent?.trim();
                     const content = event.shadowRoot?.querySelector('.room-message-text')?.textContent?.trim();
                     return { dataId, username, content };
                 }).filter(msg => msg.dataId && msg.username && msg.content);
+                
+                return { debug: 'Success', messages };
             `);
             
-            console.log('Found ' + messages.length + ' messages');
+            console.log('Debug info:', messages.debug);
+            const messageList = messages.messages || [];
+            console.log('Found ' + messageList.length + ' messages');
 
-            for (const message of messages) {
+            for (const message of messageList) {
                 if (!processedMessages.has(message.dataId)) {
                     const inserted = await db.insertMessage(message.dataId, message.username, message.content);
                     if (inserted) {
