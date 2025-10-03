@@ -96,11 +96,36 @@ async function openReddit() {
     options.addArguments('--disable-gpu');
     options.addArguments('--headless');
     options.addArguments('--window-size=1920,1080');
+    options.addArguments('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    options.addArguments('--disable-blink-features=AutomationControlled');
+    options.addArguments('--disable-extensions');
+    options.addArguments('--disable-plugins');
+    options.addArguments('--disable-web-security');
+    options.addArguments('--disable-features=VizDisplayCompositor');
+    options.excludeSwitches(['enable-automation']);
+    options.addArguments('--disable-infobars');
+    options.addArguments('--disable-background-timer-throttling');
+    options.addArguments('--disable-backgrounding-occluded-windows');
+    options.addArguments('--disable-renderer-backgrounding');
+    options.addArguments('--disable-ipc-flooding-protection');
     
     const driver = await new Builder()
         .forBrowser('chrome')
         .setChromeOptions(options)
         .build();
+    
+    // Remove webdriver property
+    await driver.executeScript('Object.defineProperty(navigator, "webdriver", {get: () => undefined});');
+    
+    // Override plugins and languages
+    await driver.executeScript(`
+        Object.defineProperty(navigator, 'plugins', {
+            get: () => [1, 2, 3, 4, 5]
+        });
+        Object.defineProperty(navigator, 'languages', {
+            get: () => ['en-US', 'en']
+        });
+    `);
     
     console.log('Browser started successfully');
     await new Promise(resolve => setTimeout(resolve, 1000));
