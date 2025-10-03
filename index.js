@@ -172,7 +172,7 @@ async function openReddit() {
         } catch (error) {
             console.error('Screenshot error:', error.message);
         }
-    }, 30000);
+    }, 5000);
     
     await monitorMessages(driver, db);
     
