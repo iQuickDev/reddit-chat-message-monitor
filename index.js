@@ -62,6 +62,7 @@ async function openReddit() {
     options.addArguments('--disable-dev-shm-usage');
     options.addArguments('--disable-gpu');
     options.addArguments('--headless');
+    options.addArguments('--window-size=1920,1080');
     
     const driver = await new Builder()
         .forBrowser('chrome')
