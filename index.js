@@ -14,55 +14,39 @@ async function monitorMessages(driver, db) {
     setInterval(async () => {
         console.log('Starting message check...');
         try {
+            // document.querySelector("body > faceplate-app > rs-app").shadowRoot.querySelector("div.rs-app-container > div > rs-page-overlay-manager > rs-room").shadowRoot.querySelector("main > rs-timeline").shadowRoot.querySelector("div > rs-virtual-scroll-dynamic").shadowRoot.querySelectorAll("rs-timeline-event")
             const messages = await driver.executeScript(`
                 const app = document.querySelector("body > faceplate-app > rs-app");
-                console.log('App element:', !!app);
                 if (!app) return { debug: 'No app element', messages: [] };
-                
                 const appShadow = app.shadowRoot;
-                console.log('App shadow:', !!appShadow);
                 if (!appShadow) return { debug: 'No app shadow', messages: [] };
-                
                 const room = appShadow.querySelector("div.rs-app-container > div > rs-page-overlay-manager > rs-room");
-                console.log('Room element:', !!room);
                 if (!room) return { debug: 'No room element', messages: [] };
-                
                 const roomShadow = room.shadowRoot;
-                console.log('Room shadow:', !!roomShadow);
                 if (!roomShadow) return { debug: 'No room shadow', messages: [] };
-                
                 const timeline = roomShadow.querySelector("main > rs-timeline");
-                console.log('Timeline element:', !!timeline);
                 if (!timeline) return { debug: 'No timeline element', messages: [] };
-                
                 const timelineShadow = timeline.shadowRoot;
-                console.log('Timeline shadow:', !!timelineShadow);
                 if (!timelineShadow) return { debug: 'No timeline shadow', messages: [] };
-                
                 const virtualScroll = timelineShadow.querySelector("div > rs-virtual-scroll-dynamic");
-                console.log('Virtual scroll element:', !!virtualScroll);
                 if (!virtualScroll) return { debug: 'No virtual scroll element', messages: [] };
-                
                 const virtualScrollShadow = virtualScroll.shadowRoot;
-                console.log('Virtual scroll shadow:', !!virtualScrollShadow);
                 if (!virtualScrollShadow) return { debug: 'No virtual scroll shadow', messages: [] };
-                
                 const events = virtualScrollShadow.querySelectorAll("rs-timeline-event");
                 console.log('Timeline events found:', events.length);
                 
                 const messages = Array.from(events).map(event => {
+                    const username = event.shadowRoot.querySelector('.room-message').getAttribute('aria-label').split(' ')[0]
                     const dataId = event.getAttribute('data-id');
-                    const username = event.shadowRoot?.querySelector('rs-username')?.textContent?.trim();
                     const content = event.shadowRoot?.querySelector('.room-message-text')?.textContent?.trim();
+                    console.log(dataId, username, content)
                     return { dataId, username, content };
                 }).filter(msg => msg.dataId && msg.username && msg.content);
                 
                 return { debug: 'Success', messages };
             `);
-            
-            console.log('Debug info:', messages.debug);
+
             const messageList = messages.messages || [];
-            console.log('Found ' + messageList.length + ' messages');
 
             for (const message of messageList) {
                 if (!processedMessages.has(message.dataId)) {
@@ -92,7 +76,7 @@ async function openReddit() {
     const options = new chrome.Options();
     options.addArguments(`--user-data-dir=${userDataDir}`);
     options.addArguments('--no-sandbox');
-    options.addArguments('--headless');
+    //options.addArguments('--headless');
     options.addArguments('--window-size=1920,1080');
     options.addArguments('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
     options.excludeSwitches(['enable-automation']);
@@ -102,10 +86,8 @@ async function openReddit() {
         .setChromeOptions(options)
         .build();
     
-    // Remove webdriver property
     await driver.executeScript('Object.defineProperty(navigator, "webdriver", {get: () => undefined});');
     
-    // Override plugins and languages
     await driver.executeScript(`
         Object.defineProperty(navigator, 'plugins', {
             get: () => [1, 2, 3, 4, 5]
@@ -136,7 +118,6 @@ async function openReddit() {
         fs.mkdirSync(stateDir);
     }
 
-    // Start screenshot capture
     setInterval(async () => {
         try {
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -147,11 +128,9 @@ async function openReddit() {
         }
     }, 5000);
 
-    // Wait for page to load and check structure
     console.log('Waiting for page to load...');
     await new Promise(resolve => setTimeout(resolve, 10000));
-    
-    // Debug page structure
+
     const pageInfo = await driver.executeScript(`
         return {
             title: document.title,
@@ -167,7 +146,7 @@ async function openReddit() {
     // Check if redirected to login
     if (pageInfo.url.includes('/login/')) {
         console.log('Redirected to login page. Attempting to login...');
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        await new Promise(resolve => setTimeout(resolve, 1000));
         // Fill username
         await driver.findElement(By.name('username')).sendKeys(process.env.REDDIT_USERNAME);
         
