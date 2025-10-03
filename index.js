@@ -116,7 +116,22 @@ async function openReddit() {
         console.log('executeScript navigation complete');
     }
     
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    // Wait for page to load and check structure
+    console.log('Waiting for page to load...');
+    await new Promise(resolve => setTimeout(resolve, 10000));
+    
+    // Debug page structure
+    const pageInfo = await driver.executeScript(`
+        return {
+            title: document.title,
+            url: window.location.href,
+            bodyChildren: document.body ? Array.from(document.body.children).map(el => el.tagName) : [],
+            faceplateApp: !!document.querySelector('faceplate-app'),
+            rsApp: !!document.querySelector('rs-app')
+        };
+    `);
+    
+    console.log('Page info:', pageInfo);
     
     await monitorMessages(driver, db);
     
