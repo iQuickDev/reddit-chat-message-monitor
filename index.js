@@ -100,14 +100,12 @@ async function openReddit() {
     options.addArguments('--disable-blink-features=AutomationControlled');
     options.addArguments('--disable-extensions');
     options.addArguments('--disable-plugins');
-    options.addArguments('--disable-web-security');
     options.addArguments('--disable-features=VizDisplayCompositor');
     options.excludeSwitches(['enable-automation']);
     options.addArguments('--disable-infobars');
     options.addArguments('--disable-background-timer-throttling');
     options.addArguments('--disable-backgrounding-occluded-windows');
     options.addArguments('--disable-renderer-backgrounding');
-    options.addArguments('--disable-ipc-flooding-protection');
     
     const driver = await new Builder()
         .forBrowser('chrome')
