@@ -138,7 +138,7 @@ async function openReddit() {
     // Check if redirected to login
     if (pageInfo.url.includes('/login/')) {
         console.log('Redirected to login page. Attempting to login...');
-        
+        await new Promise(resolve => setTimeout(resolve, 5000));
         // Fill username
         await driver.findElement(By.name('username')).sendKeys(process.env.REDDIT_USERNAME);
         
