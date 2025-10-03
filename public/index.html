@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>r/Italia Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .chart-container {
+            width: 48%;
+            display: inline-block;
+            margin: 1%;
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .stats {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .leaderboard {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .leaderboard-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            margin: 5px 0;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+        }
+
+        .rank {
+            font-weight: bold;
+            color: #007bff;
+        }
+
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        h3 {
+            color: #333;
+            margin-top: 0;
+        }
+
+        .flex {
+            display: flex;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🚀 r/Italia Chat Dashboard</h1>
+
+        <div class="stats">
+            <h3>📊 Total Messages: <span id="totalMessages">Loading...</span></h3>
+        </div>
+
+        <div class="leaderboard">
+            <h3>🏆 Leaderboard</h3>
+            <div id="leaderboardList">Loading...</div>
+        </div>
+
+        <div class="flex">
+            <div class="chart-container">
+                <canvas id="topUsersChart"></canvas>
+            </div>
+
+            <div class="chart-container">
+                <canvas id="hourlyChart"></canvas>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        async function loadStats() {
+            const response = await fetch('/api/stats');
+            const data = await response.json();
+
+            document.getElementById('totalMessages').textContent = data.totalMessages;
+
+            const leaderboard = document.getElementById('leaderboardList');
+            leaderboard.innerHTML = data.topUsers.slice(0, 10).map((user, index) =>
+                `<div class="leaderboard-item">
+                    <span><span class="rank">#${index + 1}</span> ${user.username}</span>
+                    <span><strong>${user.message_count}</strong> messages</span>
+                </div>`
+            ).join('');
+
+            Chart.getChart('topUsersChart')?.destroy();
+            Chart.getChart('hourlyChart')?.destroy();
+
+            const ctx1 = document.getElementById('topUsersChart').getContext('2d');
+            const gradient1 = ctx1.createLinearGradient(0, 0, 0, 400);
+            gradient1.addColorStop(0, 'rgba(54, 162, 235, 0.8)');
+            gradient1.addColorStop(1, 'rgba(54, 162, 235, 0.2)');
+
+            new Chart(ctx1, {
+                type: 'bar',
+                data: {
+                    labels: data.topUsers.map(u => u.username),
+                    datasets: [{
+                        label: 'Messages',
+                        data: data.topUsers.map(u => u.message_count),
+                        backgroundColor: gradient1,
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 2,
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: { display: true, text: '📈 Top Users', font: { size: 16 } },
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.1)' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+
+            // Hourly Activity Chart with gradient fill
+            const ctx2 = document.getElementById('hourlyChart').getContext('2d');
+            const gradient2 = ctx2.createLinearGradient(0, 0, 0, 400);
+            gradient2.addColorStop(0, 'rgba(255, 99, 132, 0.4)');
+            gradient2.addColorStop(1, 'rgba(255, 99, 132, 0.0)');
+
+            new Chart(ctx2, {
+                type: 'line',
+                data: {
+                    labels: data.hourlyStats.map(h => new Date(h.hour).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })),
+                    datasets: [{
+                        label: 'Messages per Hour',
+                        data: data.hourlyStats.map(h => h.count),
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        backgroundColor: gradient2,
+                        fill: true,
+                        tension: 0.4,
+                        borderWidth: 3,
+                        pointBackgroundColor: 'rgba(255, 99, 132, 1)',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: { display: true, text: '⏰ Hourly Activity (24h)', font: { size: 16 } },
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.1)' } },
+                        x: { grid: { color: 'rgba(0,0,0,0.1)' } }
+                    }
+                }
+            });
+        }
+
+        loadStats();
+        setInterval(loadStats, 30000);
+    </script>
+</body>
+
+</html>
