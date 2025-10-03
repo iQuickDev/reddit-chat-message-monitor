@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Messages - r/Italia Dashboard</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #e0e0e0;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .search-panel {
+            background: #2d2d44;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .search-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .search-input {
+            background: #3a3a5c;
+            border: 1px solid #4fc3f7;
+            border-radius: 8px;
+            padding: 10px;
+            color: #e0e0e0;
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .search-btn {
+            background: #4fc3f7;
+            color: #1a1a2e;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .messages-table {
+            background: #2d2d44;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #3a3a5c;
+        }
+
+        th {
+            background: #3a3a5c;
+            color: #4fc3f7;
+            font-weight: bold;
+        }
+
+        tr:hover {
+            background: #3a3a5c;
+        }
+
+        .back-btn {
+            background: #4fc3f7;
+            color: #1a1a2e;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-bottom: 20px;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        h1 {
+            color: #e0e0e0;
+            text-align: center;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        h3 {
+            color: #e0e0e0;
+            margin-top: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>💬 Messages</h1>
+        
+        <a href="/" class="back-btn">← Back to Dashboard</a>
+        
+        <div class="search-panel">
+            <h3>🔍 Search Messages</h3>
+            <div class="search-row">
+                <input type="text" id="textSearch" class="search-input" placeholder="Search message text...">
+                <input type="text" id="userSearch" class="search-input" placeholder="Search username...">
+            </div>
+            <div class="search-row">
+                <input type="datetime-local" id="startDate" class="search-input">
+                <input type="datetime-local" id="endDate" class="search-input">
+                <button class="search-btn" onclick="searchMessages()">Search</button>
+            </div>
+        </div>
+
+        <div class="messages-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>User</th>
+                        <th>Message</th>
+                    </tr>
+                </thead>
+                <tbody id="messagesBody">
+                    <tr><td colspan="3">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        async function searchMessages() {
+            const text = document.getElementById('textSearch').value;
+            const user = document.getElementById('userSearch').value;
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            
+            const params = new URLSearchParams();
+            if (text) params.append('text', text);
+            if (user) params.append('user', user);
+            if (startDate) params.append('startDate', startDate);
+            if (endDate) params.append('endDate', endDate);
+            
+            const response = await fetch(`/api/messages?${params}`);
+            const data = await response.json();
+            
+            const tbody = document.getElementById('messagesBody');
+            tbody.innerHTML = data.messages.map(msg => 
+                `<tr>
+                    <td>${new Date(msg.timestamp).toLocaleString()}</td>
+                    <td>${msg.username}</td>
+                    <td>${msg.message}</td>
+                </tr>`
+            ).join('');
+        }
+        
+        // Load initial messages
+        searchMessages();
+    </script>
+</body>
+</html>

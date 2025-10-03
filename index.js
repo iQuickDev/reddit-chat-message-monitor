@@ -88,6 +88,59 @@ function startServer() {
         }
     });
     
+    app.get('/api/messages', async (req, res) => {
+        const db = new Database();
+        try {
+            await db.init();
+            
+            let { text, user, startDate, endDate, limit = 100 } = req.query;
+            
+            // Input validation
+            if (text && typeof text !== 'string') text = '';
+            if (user && typeof user !== 'string') user = '';
+            if (text) text = text.substring(0, 500); // Limit length
+            if (user) user = user.substring(0, 100); // Limit length
+            
+            const parsedLimit = Math.min(Math.max(parseInt(limit) || 100, 1), 1000);
+            
+            let query = 'SELECT message_id, username, message, timestamp FROM messages WHERE 1=1';
+            const params = [];
+            
+            if (text && text.trim()) {
+                query += ' AND message LIKE ?';
+                params.push(`%${text.trim()}%`);
+            }
+            if (user && user.trim()) {
+                query += ' AND username LIKE ?';
+                params.push(`%${user.trim()}%`);
+            }
+            if (startDate) {
+                query += ' AND timestamp >= ?';
+                params.push(startDate);
+            }
+            if (endDate) {
+                query += ' AND timestamp <= ?';
+                params.push(endDate);
+            }
+            
+            query += ' ORDER BY timestamp DESC LIMIT ?';
+            params.push(parsedLimit);
+            
+            const messages = await new Promise((resolve, reject) => {
+                db.db.all(query, params, (err, rows) => {
+                    if (err) reject(err);
+                    else resolve(rows);
+                });
+            });
+            
+            res.json({ messages });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        } finally {
+            db.close();
+        }
+    });
+    
     app.listen(4438, () => {
         console.log('Dashboard server running on http://localhost:4438');
     });
