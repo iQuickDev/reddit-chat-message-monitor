@@ -10,6 +10,7 @@ async function monitorMessages(driver, db) {
     console.log('Starting message monitoring...');
     
     setInterval(async () => {
+        console.log('Starting message check...');
         try {
             const messages = await driver.executeScript(`
                 const timeline = document.querySelector("body > faceplate-app > rs-app")?.shadowRoot
@@ -28,10 +29,13 @@ async function monitorMessages(driver, db) {
                 }).filter(msg => msg.dataId && msg.username && msg.content);
             `);
             
+            console.log('Found ' + messages.length + ' messages');
+
             for (const message of messages) {
                 if (!processedMessages.has(message.dataId)) {
                     const inserted = await db.insertMessage(message.dataId, message.username, message.content);
                     if (inserted) {
+                        console.log('Saved message ' + message.dataId);
                         await db.updateUserStats(message.username);
                         console.log(`${message.username}: ${message.content}`);
                     }
@@ -81,23 +85,6 @@ async function openReddit() {
     }
     
     await new Promise(resolve => setTimeout(resolve, 3000));
-    
-    // Create state directory
-    const stateDir = path.join(__dirname, 'state');
-    if (!fs.existsSync(stateDir)) {
-        fs.mkdirSync(stateDir);
-    }
-    
-    // Start screenshot capture
-    setInterval(async () => {
-        try {
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const screenshot = await driver.takeScreenshot();
-            fs.writeFileSync(path.join(stateDir, `${timestamp}.png`), screenshot, 'base64');
-        } catch (error) {
-            console.error('Screenshot error:', error.message);
-        }
-    }, 30000);
     
     await monitorMessages(driver, db);
     
