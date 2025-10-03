@@ -14,7 +14,6 @@ class Database {
                     console.error('Error opening database:', err.message);
                     reject(err);
                 } else {
-                    console.log('Connected to SQLite database');
                     this.createTables().then(resolve).catch(reject);
                 }
             });
@@ -51,7 +50,6 @@ class Database {
                 this.db.run(createUsersTable, (err) => {
                     if (err) reject(err);
                     else {
-                        console.log('Database tables created successfully');
                         resolve();
                     }
                 });
@@ -135,7 +133,7 @@ class Database {
                 if (err) {
                     console.error('Error closing database:', err.message);
                 } else {
-                    console.log('Database connection closed');
+                    // Connection closed silently
                 }
             });
         }

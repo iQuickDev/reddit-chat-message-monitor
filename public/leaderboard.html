@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Full Leaderboard - r/Italia Dashboard</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #e0e0e0;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .leaderboard {
+            background: #2d2d44;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .leaderboard-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px;
+            margin: 8px 0;
+            background: #3a3a5c;
+            border-radius: 8px;
+            border-left: 4px solid #4fc3f7;
+            transition: background 0.2s;
+        }
+
+        .leaderboard-item:hover {
+            background: #4a4a6c;
+        }
+
+        .rank {
+            font-weight: bold;
+            color: #4fc3f7;
+            min-width: 50px;
+        }
+
+        h1 {
+            color: #e0e0e0;
+            text-align: center;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        h3 {
+            color: #e0e0e0;
+            margin-top: 0;
+        }
+
+        .back-btn {
+            background: #4fc3f7;
+            color: #1a1a2e;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-bottom: 20px;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .back-btn:hover {
+            background: #29b6f6;
+        }
+
+        .stats {
+            background: #2d2d44;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📋 Full Leaderboard</h1>
+        
+        <a href="/" class="back-btn">← Back to Dashboard</a>
+        
+        <div class="stats">
+            <h3>Total Users: <span id="totalUsers">Loading...</span></h3>
+        </div>
+
+        <div class="leaderboard">
+            <div id="fullLeaderboardList">Loading...</div>
+        </div>
+    </div>
+
+    <script>
+        async function loadFullLeaderboard() {
+            const response = await fetch('/api/full-leaderboard');
+            const data = await response.json();
+
+            document.getElementById('totalUsers').textContent = data.allUsers.length;
+
+            const leaderboard = document.getElementById('fullLeaderboardList');
+            leaderboard.innerHTML = data.allUsers.map((user, index) =>
+                `<div class="leaderboard-item">
+                    <span><span class="rank">#${index + 1}</span> ${user.username}</span>
+                    <span><strong>${user.message_count}</strong> messages</span>
+                </div>`
+            ).join('');
+        }
+
+        loadFullLeaderboard();
+        setInterval(loadFullLeaderboard, 60000);
+    </script>
+</body>
+</html>

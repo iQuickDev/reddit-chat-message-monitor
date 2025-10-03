@@ -9,8 +9,9 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 0;
             padding: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
             min-height: 100vh;
+            color: #e0e0e0;
         }
 
         .container {
@@ -22,27 +23,27 @@
             width: 48%;
             display: inline-block;
             margin: 1%;
-            background: white;
+            background: #2d2d44;
             padding: 20px;
             border-radius: 15px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
         }
 
         .stats {
-            background: white;
+            background: #2d2d44;
             padding: 20px;
             margin: 20px 0;
             border-radius: 15px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
             text-align: center;
         }
 
         .leaderboard {
-            background: white;
+            background: #2d2d44;
             padding: 20px;
             margin: 20px 0;
             border-radius: 15px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
         }
 
         .leaderboard-item {
@@ -50,30 +51,46 @@
             justify-content: space-between;
             padding: 10px;
             margin: 5px 0;
-            background: #f8f9fa;
+            background: #3a3a5c;
             border-radius: 8px;
-            border-left: 4px solid #007bff;
+            border-left: 4px solid #4fc3f7;
         }
 
         .rank {
             font-weight: bold;
-            color: #007bff;
+            color: #4fc3f7;
         }
 
         h1 {
-            color: white;
+            color: #e0e0e0;
             text-align: center;
             margin-bottom: 30px;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
         }
 
         h3 {
-            color: #333;
+            color: #e0e0e0;
             margin-top: 0;
         }
 
         .flex {
             display: flex;
+        }
+        
+        .show-all-btn {
+            background: #4fc3f7;
+            color: #1a1a2e;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 10px;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .show-all-btn:hover {
+            background: #29b6f6;
         }
     </style>
 </head>
@@ -87,8 +104,13 @@
         </div>
 
         <div class="leaderboard">
-            <h3>🏆 Leaderboard</h3>
+            <h3>🏆 Top 10 Leaderboard</h3>
             <div id="leaderboardList">Loading...</div>
+            <a href="/leaderboard.html" class="show-all-btn">View Full Leaderboard</a>
+        </div>
+
+        <div class="chart-container" style="width: 98%; margin: 20px 1%;">
+            <canvas id="overallChart"></canvas>
         </div>
 
         <div class="flex">
@@ -107,6 +129,9 @@
         async function loadStats() {
             const response = await fetch('/api/stats');
             const data = await response.json();
+            
+            const overallResponse = await fetch('/api/overall-stats');
+            const overallData = await overallResponse.json();
 
             document.getElementById('totalMessages').textContent = data.totalMessages;
 
@@ -118,8 +143,57 @@
                 </div>`
             ).join('');
 
+            Chart.getChart('overallChart')?.destroy();
             Chart.getChart('topUsersChart')?.destroy();
             Chart.getChart('hourlyChart')?.destroy();
+            
+            // Overall Messages Chart
+            if (overallData.overallStats && overallData.overallStats.length > 0) {
+                const ctx0 = document.getElementById('overallChart').getContext('2d');
+                const gradient0 = ctx0.createLinearGradient(0, 0, 0, 400);
+                gradient0.addColorStop(0, 'rgba(76, 175, 80, 0.4)');
+                gradient0.addColorStop(1, 'rgba(76, 175, 80, 0.0)');
+                
+                new Chart(ctx0, {
+                    type: 'line',
+                    data: {
+                        labels: overallData.overallStats.map(s => new Date(s.date).toLocaleDateString()),
+                        datasets: [{
+                            label: 'Total Messages',
+                            data: overallData.overallStats.map(s => s.cumulative_count),
+                            borderColor: 'rgba(76, 175, 80, 1)',
+                            backgroundColor: gradient0,
+                            fill: true,
+                            tension: 0.4,
+                            borderWidth: 3,
+                            pointBackgroundColor: 'rgba(76, 175, 80, 1)',
+                            pointBorderColor: '#2d2d44',
+                            pointBorderWidth: 2,
+                            pointRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            title: { display: true, text: '📈 Overall Messages Growth', font: { size: 18 }, color: '#e0e0e0' },
+                            legend: { display: false }
+                        },
+                        scales: {
+                            y: { 
+                                beginAtZero: true, 
+                                grid: { color: 'rgba(224, 224, 224, 0.1)' },
+                                ticks: { color: '#e0e0e0' }
+                            },
+                            x: { 
+                                grid: { color: 'rgba(224, 224, 224, 0.1)' },
+                                ticks: { color: '#e0e0e0' }
+                            }
+                        }
+                    }
+                });
+            } else {
+                console.log('No overall stats data available');
+            }
 
             const ctx1 = document.getElementById('topUsersChart').getContext('2d');
             const gradient1 = ctx1.createLinearGradient(0, 0, 0, 400);
@@ -142,12 +216,19 @@
                 options: {
                     responsive: true,
                     plugins: {
-                        title: { display: true, text: '📈 Top Users', font: { size: 16 } },
+                        title: { display: true, text: '📈 Top Users', font: { size: 16 }, color: '#e0e0e0' },
                         legend: { display: false }
                     },
                     scales: {
-                        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.1)' } },
-                        x: { grid: { display: false } }
+                        y: { 
+                            beginAtZero: true, 
+                            grid: { color: 'rgba(224, 224, 224, 0.1)' },
+                            ticks: { color: '#e0e0e0' }
+                        },
+                        x: { 
+                            grid: { display: false },
+                            ticks: { color: '#e0e0e0' }
+                        }
                     }
                 }
             });
@@ -163,7 +244,7 @@
                 data: {
                     labels: data.hourlyStats.map(h => new Date(h.hour).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })),
                     datasets: [{
-                        label: 'Messages per Hour',
+                        label: 'Messages per 30min',
                         data: data.hourlyStats.map(h => h.count),
                         borderColor: 'rgba(255, 99, 132, 1)',
                         backgroundColor: gradient2,
@@ -179,12 +260,19 @@
                 options: {
                     responsive: true,
                     plugins: {
-                        title: { display: true, text: '⏰ Hourly Activity (24h)', font: { size: 16 } },
+                        title: { display: true, text: '⏰ 30min Activity (24h)', font: { size: 16 }, color: '#e0e0e0' },
                         legend: { display: false }
                     },
                     scales: {
-                        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.1)' } },
-                        x: { grid: { color: 'rgba(0,0,0,0.1)' } }
+                        y: { 
+                            beginAtZero: true, 
+                            grid: { color: 'rgba(224, 224, 224, 0.1)' },
+                            ticks: { color: '#e0e0e0' }
+                        },
+                        x: { 
+                            grid: { color: 'rgba(224, 224, 224, 0.1)' },
+                            ticks: { color: '#e0e0e0' }
+                        }
                     }
                 }
             });

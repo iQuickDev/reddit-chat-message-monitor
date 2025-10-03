@@ -25,7 +25,8 @@ function startServer() {
             const hourlyStats = await new Promise((resolve, reject) => {
                 db.db.all(`
                     SELECT 
-                        strftime('%Y-%m-%d %H:00:00', timestamp) as hour,
+                        strftime('%Y-%m-%d %H:', timestamp) || 
+                        CASE WHEN CAST(strftime('%M', timestamp) AS INTEGER) < 30 THEN '00' ELSE '30' END || ':00' as hour,
                         COUNT(*) as count
                     FROM messages 
                     WHERE timestamp >= datetime('now', '-24 hours')
@@ -39,6 +40,47 @@ function startServer() {
             
             res.json({ totalMessages, topUsers, hourlyStats });
             
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        } finally {
+            db.close();
+        }
+    });
+    
+    app.get('/api/full-leaderboard', async (req, res) => {
+        const db = new Database();
+        try {
+            await db.init();
+            const allUsers = await db.getTopUsers(1000);
+            res.json({ allUsers });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        } finally {
+            db.close();
+        }
+    });
+    
+    app.get('/api/overall-stats', async (req, res) => {
+        const db = new Database();
+        try {
+            await db.init();
+            
+            const overallStats = await new Promise((resolve, reject) => {
+                db.db.all(`
+                    SELECT 
+                        DATE(timestamp) as date,
+                        COUNT(*) as daily_count,
+                        SUM(COUNT(*)) OVER (ORDER BY DATE(timestamp)) as cumulative_count
+                    FROM messages 
+                    GROUP BY DATE(timestamp)
+                    ORDER BY date
+                `, (err, rows) => {
+                    if (err) reject(err);
+                    else resolve(rows);
+                });
+            });
+            
+            res.json({ overallStats });
         } catch (error) {
             res.status(500).json({ error: error.message });
         } finally {
