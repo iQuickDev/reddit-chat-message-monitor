@@ -12,6 +12,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "dotenv": "^17.2.3",
     "selenium-webdriver": "^4.15.0",
     "sqlite3": "^5.1.7"
   }

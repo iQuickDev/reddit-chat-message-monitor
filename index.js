@@ -3,6 +3,8 @@ const chrome = require('selenium-webdriver/chrome');
 const Database = require('./database');
 const fs = require('fs');
 const path = require('path');
+const dotenv = require('dotenv')
+dotenv.config();
 
 let processedMessages = new Set();
 
@@ -92,7 +94,7 @@ async function openReddit() {
     options.addArguments('--no-sandbox');
     options.addArguments('--disable-dev-shm-usage');
     options.addArguments('--disable-gpu');
-    options.addArguments('--headless');
+    //options.addArguments('--headless');
     options.addArguments('--window-size=1920,1080');
     
     const driver = await new Builder()
@@ -132,6 +134,28 @@ async function openReddit() {
     `);
     
     console.log('Page info:', pageInfo);
+    
+    // Check if redirected to login
+    if (pageInfo.url.includes('/login/')) {
+        console.log('Redirected to login page. Attempting to login...');
+        
+        // Fill username
+        await driver.findElement(By.name('username')).sendKeys(process.env.REDDIT_USERNAME);
+        
+        // Fill password
+        await driver.findElement(By.name('password')).sendKeys(process.env.REDDIT_PASSWORD);
+        
+        // Click login button
+        await driver.findElement(By.className('login')).click();
+        
+        // Wait for login to complete
+        console.log('Waiting for login to complete...');
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        
+        // Navigate to chat again
+        await driver.get(url);
+        await new Promise(resolve => setTimeout(resolve, 5000));
+    }
     
     await monitorMessages(driver, db);
     
