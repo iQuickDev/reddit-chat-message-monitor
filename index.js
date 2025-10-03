@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const dotenv = require('dotenv')
 dotenv.config();
+const path = require('path');
 
 let processedMessages = new Set();
 
@@ -12,9 +13,7 @@ async function monitorMessages(driver, db) {
     console.log('Starting message monitoring...');
     
     setInterval(async () => {
-        console.log('Starting message check...');
         try {
-            // document.querySelector("body > faceplate-app > rs-app").shadowRoot.querySelector("div.rs-app-container > div > rs-page-overlay-manager > rs-room").shadowRoot.querySelector("main > rs-timeline").shadowRoot.querySelector("div > rs-virtual-scroll-dynamic").shadowRoot.querySelectorAll("rs-timeline-event")
             const messages = await driver.executeScript(`
                 const app = document.querySelector("body > faceplate-app > rs-app");
                 if (!app) return { debug: 'No app element', messages: [] };
@@ -43,10 +42,10 @@ async function monitorMessages(driver, db) {
                     return { dataId, username, content };
                 }).filter(msg => msg.dataId && msg.username && msg.content);
                 
-                return { debug: 'Success', messages };
+                return messages;
             `);
 
-            const messageList = messages.messages || [];
+            const messageList = messages || [];
 
             for (const message of messageList) {
                 if (!processedMessages.has(message.dataId)) {
@@ -70,7 +69,6 @@ async function openReddit() {
     await db.init();
     
     console.log('Starting browser...');
-    const path = require('path');
     const userDataDir = path.join(__dirname, 'chrome-user-data');
     
     const options = new chrome.Options();
@@ -118,16 +116,6 @@ async function openReddit() {
         fs.mkdirSync(stateDir);
     }
 
-    setInterval(async () => {
-        try {
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const screenshot = await driver.takeScreenshot();
-            fs.writeFileSync(path.join(stateDir, `${timestamp}.png`), screenshot, 'base64');
-        } catch (error) {
-            console.error('Screenshot error:', error.message);
-        }
-    }, 5000);
-
     console.log('Waiting for page to load...');
     await new Promise(resolve => setTimeout(resolve, 10000));
 
@@ -143,24 +131,14 @@ async function openReddit() {
     
     console.log('Page info:', pageInfo);
     
-    // Check if redirected to login
     if (pageInfo.url.includes('/login/')) {
         console.log('Redirected to login page. Attempting to login...');
         await new Promise(resolve => setTimeout(resolve, 1000));
-        // Fill username
         await driver.findElement(By.name('username')).sendKeys(process.env.REDDIT_USERNAME);
-        
-        // Fill password
         await driver.findElement(By.name('password')).sendKeys(process.env.REDDIT_PASSWORD);
-        
-        // Click login button
         await driver.findElement(By.className('login')).click();
-        
-        // Wait for login to complete
         console.log('Waiting for login to complete...');
         await new Promise(resolve => setTimeout(resolve, 5000));
-        
-        // Navigate to chat again
         await driver.get(url);
         await new Promise(resolve => setTimeout(resolve, 5000));
     }
