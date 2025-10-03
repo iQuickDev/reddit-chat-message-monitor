@@ -118,6 +118,11 @@ async function openReddit() {
         console.log('executeScript navigation complete');
     }
     
+    const stateDir = path.join(__dirname, 'state');
+    if (!fs.existsSync(stateDir)) {
+        fs.mkdirSync(stateDir);
+    }
+
     // Start screenshot capture
     setInterval(async () => {
         try {
@@ -167,12 +172,7 @@ async function openReddit() {
         await driver.get(url);
         await new Promise(resolve => setTimeout(resolve, 5000));
     }
-    
-    // Create state directory
-    const stateDir = path.join(__dirname, 'state');
-    if (!fs.existsSync(stateDir)) {
-        fs.mkdirSync(stateDir);
-    }
+ 
     
     await monitorMessages(driver, db);
     
