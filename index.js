@@ -92,20 +92,10 @@ async function openReddit() {
     const options = new chrome.Options();
     options.addArguments(`--user-data-dir=${userDataDir}`);
     options.addArguments('--no-sandbox');
-    options.addArguments('--disable-dev-shm-usage');
-    options.addArguments('--disable-gpu');
     options.addArguments('--headless');
     options.addArguments('--window-size=1920,1080');
     options.addArguments('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-    options.addArguments('--disable-blink-features=AutomationControlled');
-    options.addArguments('--disable-extensions');
-    options.addArguments('--disable-plugins');
-    options.addArguments('--disable-features=VizDisplayCompositor');
     options.excludeSwitches(['enable-automation']);
-    options.addArguments('--disable-infobars');
-    options.addArguments('--disable-background-timer-throttling');
-    options.addArguments('--disable-backgrounding-occluded-windows');
-    options.addArguments('--disable-renderer-backgrounding');
     
     const driver = await new Builder()
         .forBrowser('chrome')
