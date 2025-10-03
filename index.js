@@ -118,6 +118,17 @@ async function openReddit() {
         console.log('executeScript navigation complete');
     }
     
+    // Start screenshot capture
+    setInterval(async () => {
+        try {
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const screenshot = await driver.takeScreenshot();
+            fs.writeFileSync(path.join(stateDir, `${timestamp}.png`), screenshot, 'base64');
+        } catch (error) {
+            console.error('Screenshot error:', error.message);
+        }
+    }, 5000);
+
     // Wait for page to load and check structure
     console.log('Waiting for page to load...');
     await new Promise(resolve => setTimeout(resolve, 10000));
@@ -162,17 +173,6 @@ async function openReddit() {
     if (!fs.existsSync(stateDir)) {
         fs.mkdirSync(stateDir);
     }
-    
-    // Start screenshot capture
-    setInterval(async () => {
-        try {
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const screenshot = await driver.takeScreenshot();
-            fs.writeFileSync(path.join(stateDir, `${timestamp}.png`), screenshot, 'base64');
-        } catch (error) {
-            console.error('Screenshot error:', error.message);
-        }
-    }, 5000);
     
     await monitorMessages(driver, db);
     
