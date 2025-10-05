@@ -205,7 +205,15 @@
             const tbody = document.getElementById('messagesBody');
             tbody.innerHTML = data.messages.map(msg => 
                 `<tr>
-                    <td>${new Date(msg.timestamp).toLocaleString()}</td>
+                    <td>${new Date(msg.timestamp).toLocaleString('it-IT', {
+                        timeZone: 'Europe/Rome',
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit'
+                    })}</td>
                     <td>${msg.username}</td>
                     <td>${msg.message}</td>
                 </tr>`

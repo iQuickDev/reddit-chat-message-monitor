@@ -198,7 +198,9 @@
                 new Chart(ctx0, {
                     type: 'line',
                     data: {
-                        labels: overallData.overallStats.map(s => new Date(s.date).toLocaleDateString()),
+                        labels: overallData.overallStats.map(s => new Date(s.date).toLocaleDateString('it-IT', {
+                            timeZone: 'Europe/Rome'
+                        })),
                         datasets: [{
                             label: 'Total Messages',
                             data: overallData.overallStats.map(s => s.cumulative_count),
@@ -283,7 +285,11 @@
             new Chart(ctx2, {
                 type: 'line',
                 data: {
-                    labels: data.hourlyStats.map(h => new Date(h.hour).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })),
+                    labels: data.hourlyStats.map(h => new Date(h.hour).toLocaleTimeString('it-IT', { 
+                        timeZone: 'Europe/Rome',
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                    })),
                     datasets: [{
                         label: 'Messages per 30min',
                         data: data.hourlyStats.map(h => h.count),
