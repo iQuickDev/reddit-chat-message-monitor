@@ -2,6 +2,7 @@
 <html>
 
 <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>r/Italia Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -27,6 +28,45 @@
             padding: 20px;
             border-radius: 15px;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            
+            .container {
+                max-width: 100%;
+            }
+            
+            .chart-container {
+                width: 98%;
+                display: block;
+                margin: 10px 1%;
+                padding: 15px;
+            }
+            
+            .flex {
+                flex-direction: column;
+            }
+            
+            h1 {
+                font-size: 1.5em;
+                margin-bottom: 20px;
+            }
+            
+            .leaderboard-item {
+                flex-direction: column;
+                gap: 5px;
+                text-align: center;
+            }
+            
+            .show-all-btn {
+                display: block;
+                margin: 10px auto;
+                text-align: center;
+                width: fit-content;
+            }
         }
 
         .stats {
