@@ -28,7 +28,8 @@ class Database {
                     username TEXT NOT NULL,
                     message TEXT NOT NULL,
                     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    message_id TEXT UNIQUE
+                    message_id TEXT UNIQUE,
+                    visible INTEGER DEFAULT 1
                 )
             `;
 
@@ -38,7 +39,8 @@ class Database {
                     username TEXT UNIQUE NOT NULL,
                     message_count INTEGER DEFAULT 0,
                     first_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    last_seen DATETIME DEFAULT CURRENT_TIMESTAMP
+                    last_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    track INTEGER DEFAULT 1
                 )
             `;
 
@@ -49,9 +51,17 @@ class Database {
                 
                 this.db.run(createUsersTable, (err) => {
                     if (err) reject(err);
-                    else {
-                        resolve();
-                    }
+                });
+                
+                // Add visible column to existing tables if it doesn't exist
+                this.db.run('ALTER TABLE messages ADD COLUMN visible INTEGER DEFAULT 1', (err) => {
+                    // Ignore error if column already exists
+                });
+                
+                // Add track column to users table if it doesn't exist
+                this.db.run('ALTER TABLE users ADD COLUMN track INTEGER DEFAULT 1', (err) => {
+                    // Ignore error if column already exists
+                    resolve();
                 });
             });
         });
@@ -66,13 +76,13 @@ class Database {
         });
     }
 
-    async insertMessage(messageId, username, message, roomId = null) {
+    async insertMessage(messageId, username, message, visible = 1) {
         const exists = await this.messageExists(messageId);
         if (exists) return null;
         
         return new Promise((resolve, reject) => {
-            const stmt = this.db.prepare('INSERT INTO messages (message_id, username, message) VALUES (?, ?, ?)');
-            stmt.run([messageId, username, message], function(err) {
+            const stmt = this.db.prepare('INSERT INTO messages (message_id, username, message, visible) VALUES (?, ?, ?, ?)');
+            stmt.run([messageId, username, message, visible], function(err) {
                 if (err) reject(err);
                 else resolve(this.lastID);
             });
@@ -102,10 +112,10 @@ class Database {
             let query, params;
             
             if (username) {
-                query = 'SELECT COUNT(*) as count FROM messages WHERE username = ?';
+                query = 'SELECT COUNT(*) as count FROM messages WHERE username = ? AND visible = 1';
                 params = [username];
             } else {
-                query = 'SELECT COUNT(*) as count FROM messages';
+                query = 'SELECT COUNT(*) as count FROM messages WHERE visible = 1';
                 params = [];
             }
 
@@ -123,6 +133,30 @@ class Database {
             this.db.all(query, [limit], (err, rows) => {
                 if (err) reject(err);
                 else resolve(rows);
+            });
+        });
+    }
+
+    async getUserTrackStatus(username) {
+        return new Promise((resolve, reject) => {
+            this.db.get('SELECT track FROM users WHERE username = ?', [username], (err, row) => {
+                if (err) reject(err);
+                else resolve(row ? row.track : 1);
+            });
+        });
+    }
+
+    async setUserTrackStatus(username, track) {
+        return new Promise((resolve, reject) => {
+            const updateStmt = `
+                INSERT INTO users (username, track, message_count, first_seen, last_seen) 
+                VALUES (?, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON CONFLICT(username) DO UPDATE SET track = ?
+            `;
+            
+            this.db.run(updateStmt, [username, track, track], function(err) {
+                if (err) reject(err);
+                else resolve();
             });
         });
     }

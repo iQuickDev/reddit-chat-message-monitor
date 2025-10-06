@@ -9,10 +9,10 @@ dotenv.config();
 
 let processedMessages = new Set();
 
-// Start web server
 function startServer() {
     const app = express();
     app.use(express.static('public'));
+    app.use(express.json());
     
     app.get('/api/stats', async (req, res) => {
         const db = new Database();
@@ -29,7 +29,7 @@ function startServer() {
                         CASE WHEN CAST(strftime('%M', timestamp) AS INTEGER) < 30 THEN '00' ELSE '30' END || ':00' as hour,
                         COUNT(*) as count
                     FROM messages 
-                    WHERE timestamp >= datetime('now', '-24 hours')
+                    WHERE timestamp >= datetime('now', '-24 hours') AND visible = 1
                     GROUP BY hour
                     ORDER BY hour
                 `, (err, rows) => {
@@ -72,6 +72,7 @@ function startServer() {
                         COUNT(*) as daily_count,
                         SUM(COUNT(*)) OVER (ORDER BY DATE(timestamp)) as cumulative_count
                     FROM messages 
+                    WHERE visible = 1
                     GROUP BY DATE(timestamp)
                     ORDER BY date
                 `, (err, rows) => {
@@ -103,7 +104,7 @@ function startServer() {
             
             const parsedLimit = Math.min(Math.max(parseInt(limit) || 100, 1), 1000);
             
-            let query = 'SELECT message_id, username, message, timestamp FROM messages WHERE 1=1';
+            let query = 'SELECT message_id, username, message, timestamp FROM messages WHERE visible = 1';
             const params = [];
             
             if (text && text.trim()) {
@@ -141,10 +142,31 @@ function startServer() {
         }
     });
     
+
+    app.get('/api/do-not-track', async (req, res) => {
+        const db = new Database();
+        try {
+            await db.init();
+            const users = await new Promise((resolve, reject) => {
+                db.db.all('SELECT username FROM users WHERE track = 0', (err, rows) => {
+                    if (err) reject(err);
+                    else resolve(rows.map(row => row.username));
+                });
+            });
+            res.json({ users });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        } finally {
+            db.close();
+        }
+    });
+    
     app.listen(4438, () => {
         console.log('Dashboard server running on http://localhost:4438');
     });
 }
+
+
 
 async function monitorMessages(driver, db) {
     console.log('Starting message monitoring...');
@@ -169,13 +191,11 @@ async function monitorMessages(driver, db) {
                 const virtualScrollShadow = virtualScroll.shadowRoot;
                 if (!virtualScrollShadow) return { debug: 'No virtual scroll shadow', messages: [] };
                 const events = virtualScrollShadow.querySelectorAll("rs-timeline-event");
-                console.log('Timeline events found:', events.length);
                 
                 const messages = Array.from(events).map(event => {
                     const username = event.shadowRoot.querySelector('.room-message').getAttribute('aria-label').split(' ')[0]
                     const dataId = event.getAttribute('data-id');
                     const content = event.shadowRoot?.querySelector('.room-message-text')?.textContent?.trim();
-                    console.log(dataId, username, content)
                     return { dataId, username, content };
                 }).filter(msg => msg.dataId && msg.username && msg.content);
                 
@@ -186,7 +206,18 @@ async function monitorMessages(driver, db) {
 
             for (const message of messageList) {
                 if (!processedMessages.has(message.dataId)) {
-                    const inserted = await db.insertMessage(message.dataId, message.username, message.content);
+                    // Check for Italian tracking commands
+                    if (message.content.toLowerCase() === '/dt') {
+                        await db.setUserTrackStatus(message.username, 0);
+                        console.log(`${message.username} disabled tracking`);
+                    } else if (message.content.toLowerCase() === '/at') {
+                        await db.setUserTrackStatus(message.username, 1);
+                        console.log(`${message.username} enabled tracking`);
+                    }
+                    
+                    const trackStatus = await db.getUserTrackStatus(message.username);
+                    const visible = trackStatus === 1 ? 1 : 0;
+                    const inserted = await db.insertMessage(message.dataId, message.username, message.content, visible);
                     if (inserted) {
                         await db.updateUserStats(message.username);
                         console.log(`${message.username}: ${message.content}`);
@@ -210,7 +241,7 @@ async function openReddit() {
     const options = new chrome.Options();
     options.addArguments(`--user-data-dir=${userDataDir}`);
     options.addArguments('--no-sandbox');
-    options.addArguments('--headless');
+    //options.addArguments('--headless');
     options.addArguments('--window-size=1920,1080');
     options.addArguments('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
     options.excludeSwitches(['enable-automation']);
