@@ -241,7 +241,7 @@ async function openReddit() {
     const options = new chrome.Options();
     options.addArguments(`--user-data-dir=${userDataDir}`);
     options.addArguments('--no-sandbox');
-    //options.addArguments('--headless');
+    options.addArguments('--headless');
     options.addArguments('--window-size=1920,1080');
     options.addArguments('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
     options.excludeSwitches(['enable-automation']);
