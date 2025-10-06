@@ -65,7 +65,7 @@ app.get('/api/messages', async (req, res) => {
         await db.init();
         
         const { text, user, startDate, endDate } = req.query;
-        let query = 'SELECT * FROM messages WHERE 1=1';
+        let query = 'SELECT * FROM messages WHERE visible = 1';
         const params = [];
         
         if (text) {
