@@ -76,20 +76,6 @@ class Database {
         });
     }
 
-    async insertMessage(messageId, username, message, visible = 1) {
-        const exists = await this.messageExists(messageId);
-        if (exists) return null;
-        
-        return new Promise((resolve, reject) => {
-            const stmt = this.db.prepare('INSERT INTO messages (message_id, username, message, visible) VALUES (?, ?, ?, ?)');
-            stmt.run([messageId, username, message, visible], function(err) {
-                if (err) reject(err);
-                else resolve(this.lastID);
-            });
-            stmt.finalize();
-        });
-    }
-
     async updateUserStats(username) {
         return new Promise((resolve, reject) => {
             const updateStmt = `
@@ -133,30 +119,6 @@ class Database {
             this.db.all(query, [limit], (err, rows) => {
                 if (err) reject(err);
                 else resolve(rows);
-            });
-        });
-    }
-
-    async getUserTrackStatus(username) {
-        return new Promise((resolve, reject) => {
-            this.db.get('SELECT track FROM users WHERE username = ?', [username], (err, row) => {
-                if (err) reject(err);
-                else resolve(row ? row.track : 1);
-            });
-        });
-    }
-
-    async setUserTrackStatus(username, track) {
-        return new Promise((resolve, reject) => {
-            const updateStmt = `
-                INSERT INTO users (username, track, message_count, first_seen, last_seen) 
-                VALUES (?, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                ON CONFLICT(username) DO UPDATE SET track = ?
-            `;
-            
-            this.db.run(updateStmt, [username, track, track], function(err) {
-                if (err) reject(err);
-                else resolve();
             });
         });
     }
