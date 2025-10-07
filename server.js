@@ -1,7 +1,6 @@
 const express = require('express');
 const Database = require('./database');
 
-// Timezone conversion helper
 function convertToRomeTime(utcTimestamp) {
     return new Date(utcTimestamp).toLocaleString('en-CA', {
         timeZone: 'Europe/Rome',

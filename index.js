@@ -1,56 +1,13 @@
-const { Builder, until, By } = require('selenium-webdriver');
+const { Builder, By } = require('selenium-webdriver');
 const chrome = require('selenium-webdriver/chrome');
 const Database = require('./database');
 const fs = require('fs');
 const path = require('path');
-const express = require('express');
 const dotenv = require('dotenv')
+const server = require('./server')
 dotenv.config();
 
 let processedMessages = new Set();
-
-function startServer() {
-    const app = express();
-    app.use(express.static('public'));
-    app.use(express.json());
-    
-    app.get('/api/stats', async (req, res) => {
-        const db = new Database();
-        try {
-            await db.init();
-            
-            const totalMessages = await db.getMessageCount();
-            const topUsers = await db.getTopUsers(20);
-            
-            const hourlyStats = await new Promise((resolve, reject) => {
-                db.db.all(`
-                    SELECT 
-                        strftime('%Y-%m-%d %H:', timestamp) || 
-                        CASE WHEN CAST(strftime('%M', timestamp) AS INTEGER) < 30 THEN '00' ELSE '30' END || ':00' as hour,
-                        COUNT(*) as count
-                    FROM messages 
-                    WHERE timestamp >= datetime('now', '-24 hours') AND visible = 1
-                    GROUP BY hour
-                    ORDER BY hour
-                `, (err, rows) => {
-                    if (err) reject(err);
-                    else resolve(rows);
-                });
-            });
-            
-            res.json({ totalMessages, topUsers, hourlyStats });
-            
-        } catch (error) {
-            res.status(500).json({ error: error.message });
-        } finally {
-            db.close();
-        }
-    });
-
-    app.listen(4438, () => {
-        console.log('Dashboard server running on http://localhost:4438');
-    });
-}
 
 async function sendMessage(driver, message) {
     driver.executeScript(`
@@ -213,7 +170,6 @@ async function openReddit() {
     // db.close();
 }
 
-startServer();
 openReddit().catch(err => {
     console.error('Error:', err.message);
     process.exit(1);
