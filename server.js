@@ -1,6 +1,7 @@
 const express = require('express');
 const Database = require('./database');
 
+// Timezone conversion helper
 function convertToRomeTime(utcTimestamp) {
     return new Date(utcTimestamp).toLocaleString('en-CA', {
         timeZone: 'Europe/Rome',
@@ -50,6 +51,56 @@ app.get('/api/stats', async (req, res) => {
             topUsers,
             hourlyStats
         });
+        
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    } finally {
+        db.close();
+    }
+});
+
+app.get('/api/messages', async (req, res) => {
+    const db = new Database();
+    try {
+        await db.init();
+        
+        const { text, user, startDate, endDate } = req.query;
+        let query = 'SELECT * FROM messages WHERE visible = 1';
+        const params = [];
+        
+        if (text) {
+            query += ' AND message LIKE ?';
+            params.push(`%${text}%`);
+        }
+        
+        if (user) {
+            query += ' AND username LIKE ?';
+            params.push(`%${user}%`);
+        }
+        
+        if (startDate) {
+            query += ' AND timestamp >= ?';
+            params.push(startDate);
+        }
+        
+        if (endDate) {
+            query += ' AND timestamp <= ?';
+            params.push(endDate);
+        }
+        
+        query += ' ORDER BY timestamp DESC LIMIT 100';
+        
+        const messages = await new Promise((resolve, reject) => {
+            db.db.all(query, params, (err, rows) => {
+                if (err) reject(err);
+                else resolve(rows.map(row => ({
+                    ...row,
+                    timestamp: convertToRomeTime(row.timestamp)
+                })));
+            });
+        });
+        
+        res.json({ messages });
         
     } catch (error) {
         res.status(500).json({ error: error.message });

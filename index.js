@@ -3,11 +3,171 @@ const chrome = require('selenium-webdriver/chrome');
 const Database = require('./database');
 const fs = require('fs');
 const path = require('path');
-const { spawn } = require('child_process');
-const dotenv = require('dotenv');
+const express = require('express');
+const dotenv = require('dotenv')
 dotenv.config();
 
 let processedMessages = new Set();
+
+function startServer() {
+    const app = express();
+    app.use(express.static('public'));
+    app.use(express.json());
+    
+    app.get('/api/stats', async (req, res) => {
+        const db = new Database();
+        try {
+            await db.init();
+            
+            const totalMessages = await db.getMessageCount();
+            const topUsers = await db.getTopUsers(20);
+            
+            const hourlyStats = await new Promise((resolve, reject) => {
+                db.db.all(`
+                    SELECT 
+                        strftime('%Y-%m-%d %H:', timestamp) || 
+                        CASE WHEN CAST(strftime('%M', timestamp) AS INTEGER) < 30 THEN '00' ELSE '30' END || ':00' as hour,
+                        COUNT(*) as count
+                    FROM messages 
+                    WHERE timestamp >= datetime('now', '-24 hours') AND visible = 1
+                    GROUP BY hour
+                    ORDER BY hour
+                `, (err, rows) => {
+                    if (err) reject(err);
+                    else resolve(rows);
+                });
+            });
+            
+            res.json({ totalMessages, topUsers, hourlyStats });
+            
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        } finally {
+            db.close();
+        }
+    });
+    
+    app.get('/api/full-leaderboard', async (req, res) => {
+        const db = new Database();
+        try {
+            await db.init();
+            const allUsers = await db.getTopUsers(1000);
+            res.json({ allUsers });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        } finally {
+            db.close();
+        }
+    });
+    
+    app.get('/api/overall-stats', async (req, res) => {
+        const db = new Database();
+        try {
+            await db.init();
+            
+            const overallStats = await new Promise((resolve, reject) => {
+                db.db.all(`
+                    SELECT 
+                        DATE(timestamp) as date,
+                        COUNT(*) as daily_count,
+                        SUM(COUNT(*)) OVER (ORDER BY DATE(timestamp)) as cumulative_count
+                    FROM messages 
+                    WHERE visible = 1
+                    GROUP BY DATE(timestamp)
+                    ORDER BY date
+                `, (err, rows) => {
+                    if (err) reject(err);
+                    else resolve(rows);
+                });
+            });
+            
+            res.json({ overallStats });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        } finally {
+            db.close();
+        }
+    });
+    
+    app.get('/api/messages', async (req, res) => {
+        const db = new Database();
+        try {
+            await db.init();
+            
+            let { text, user, startDate, endDate, limit = 100 } = req.query;
+            
+            // Input validation
+            if (text && typeof text !== 'string') text = '';
+            if (user && typeof user !== 'string') user = '';
+            if (text) text = text.substring(0, 500); // Limit length
+            if (user) user = user.substring(0, 100); // Limit length
+            
+            const parsedLimit = Math.min(Math.max(parseInt(limit) || 100, 1), 1000);
+            
+            let query = 'SELECT message_id, username, message, timestamp FROM messages WHERE visible = 1';
+            const params = [];
+            
+            if (text && text.trim()) {
+                query += ' AND message LIKE ?';
+                params.push(`%${text.trim()}%`);
+            }
+            if (user && user.trim()) {
+                query += ' AND username LIKE ?';
+                params.push(`%${user.trim()}%`);
+            }
+            if (startDate) {
+                query += ' AND timestamp >= ?';
+                params.push(startDate);
+            }
+            if (endDate) {
+                query += ' AND timestamp <= ?';
+                params.push(endDate);
+            }
+            
+            query += ' ORDER BY timestamp DESC LIMIT ?';
+            params.push(parsedLimit);
+            
+            const messages = await new Promise((resolve, reject) => {
+                db.db.all(query, params, (err, rows) => {
+                    if (err) reject(err);
+                    else resolve(rows);
+                });
+            });
+            
+            res.json({ messages });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        } finally {
+            db.close();
+        }
+    });
+    
+
+    app.get('/api/do-not-track', async (req, res) => {
+        const db = new Database();
+        try {
+            await db.init();
+            const users = await new Promise((resolve, reject) => {
+                db.db.all('SELECT username FROM users WHERE track = 0', (err, rows) => {
+                    if (err) reject(err);
+                    else resolve(rows.map(row => row.username));
+                });
+            });
+            res.json({ users });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        } finally {
+            db.close();
+        }
+    });
+    
+    app.listen(4438, () => {
+        console.log('Dashboard server running on http://localhost:4438');
+    });
+}
+
+
+
 async function monitorMessages(driver, db) {
     console.log('Starting message monitoring...');
     
@@ -46,7 +206,22 @@ async function monitorMessages(driver, db) {
 
             for (const message of messageList) {
                 if (!processedMessages.has(message.dataId)) {
-                    await db.updateUserStats(message.username);
+                    // Check for Italian tracking commands
+                    if (message.content.toLowerCase() === '/dt') {
+                        await db.setUserTrackStatus(message.username, 0);
+                        console.log(`${message.username} disabled tracking`);
+                    } else if (message.content.toLowerCase() === '/at') {
+                        await db.setUserTrackStatus(message.username, 1);
+                        console.log(`${message.username} enabled tracking`);
+                    }
+                    
+                    const trackStatus = await db.getUserTrackStatus(message.username);
+                    const visible = trackStatus === 1 ? 1 : 0;
+                    const inserted = await db.insertMessage(message.dataId, message.username, message.content, visible);
+                    if (inserted) {
+                        await db.updateUserStats(message.username);
+                        console.log(`${message.username}: ${message.content}`);
+                    }
                     processedMessages.add(message.dataId);
                 }
             }
@@ -142,11 +317,8 @@ async function openReddit() {
     // db.close();
 }
 
-const server = spawn('node', ['server.js'], { stdio: 'inherit' });
-server.on('error', (err) => {
-    console.error('Failed to start server:', err);
-});
-
+// Start both server and monitoring
+startServer();
 openReddit().catch(err => {
     console.error('Error:', err.message);
     process.exit(1);
