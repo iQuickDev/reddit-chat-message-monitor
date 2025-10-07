@@ -44,7 +44,7 @@ async function monitorMessages(driver, db) {
                 const events = virtualScrollShadow.querySelectorAll("rs-timeline-event");
                 
                 const messages = Array.from(events).map(event => {
-                    const username = event.shadowRoot.querySelector('.room-message').getAttribute('aria-label').split(' ')[0]
+                    const username = event.shadowRoot.querySelector('.room-message')?.getAttribute('aria-label').split(' ')[0]
                     const dataId = event.getAttribute('data-id');
                     const content = event.shadowRoot?.querySelector('.room-message-text')?.textContent?.trim();
                     return { dataId, username, content };
@@ -94,7 +94,7 @@ async function openReddit() {
     const options = new chrome.Options();
     options.addArguments(`--user-data-dir=${userDataDir}`);
     options.addArguments('--no-sandbox');
-    options.addArguments('--headless');
+    //options.addArguments('--headless');
     options.addArguments('--window-size=1920,1080');
     options.addArguments('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
     options.excludeSwitches(['enable-automation']);
