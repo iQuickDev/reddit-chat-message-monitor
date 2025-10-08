@@ -4,3 +4,4 @@ node_modules
 state/
 .env
 gemini-user-data
+grok-user-data

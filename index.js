@@ -1,6 +1,7 @@
 const { Builder, By } = require('selenium-webdriver');
 const chrome = require('selenium-webdriver/chrome');
 const Database = require('./database');
+const GrokHandler = require('./grok-handler');
 const fs = require('fs');
 const path = require('path');
 const dotenv = require('dotenv')
@@ -8,6 +9,8 @@ const server = require('./server')
 dotenv.config();
 
 let processedMessages = new Set();
+let grok = null;
+const BOT_NAME = process.env.BOT_NAME || 'bot';
 const PROCESSED_MESSAGES_FILE = path.join(__dirname, 'state', 'processed-messages.json');
 
 function loadProcessedMessages() {
@@ -34,10 +37,10 @@ async function sendMessage(driver, message) {
     driver.executeScript(`
         const textarea = document.querySelector("body > faceplate-app > rs-app").shadowRoot.querySelector("div.rs-app-container > div > rs-page-overlay-manager > rs-room").shadowRoot.querySelector("main > rs-message-composer").shadowRoot.querySelector("div > form > div.message-box").querySelector("textarea");
         const sendButton = document.querySelector("body > faceplate-app > rs-app").shadowRoot.querySelector("div.rs-app-container > div > rs-page-overlay-manager > rs-room").shadowRoot.querySelector("main > rs-message-composer").shadowRoot.querySelector("div > form > div.flex.gap-2xs.py-2xs > faceplate-tooltip.ml-auto > button");
-        textarea.value = "${message}";
+        textarea.value = arguments[0];
         textarea.dispatchEvent(new Event('input', { bubbles: true }));
         setTimeout(() => sendButton.click(), 1000);
-    `)
+    `, message)
     }
 
 async function monitorMessages(driver, db) {
@@ -89,25 +92,25 @@ async function monitorMessages(driver, db) {
                         console.log(`${message.username} enabled tracking`);
                         await sendMessage(driver, `@${message.username} Tracking messaggi attivato`);
                     }
-                    // else if (message.content.toLowerCase().includes(`@${BOT_NAME.toLowerCase()}`) || message.content.toLowerCase().includes(BOT_NAME.toLowerCase())) {
-                    //     if (gemini && gemini.isReady) {
-                    //         console.log(`Bot mentioned by ${message.username}: ${message.content}`);
-                    //         const question = message.content.replace(new RegExp(`@?${BOT_NAME}`, 'gi'), '').trim();
-                    //         if (question) {
-                    //             const queuePos = gemini.getQueueLength();
-                    //             if (queuePos > 0) {
-                    //                 await sendMessage(driver, `@${message.username} Question queued (position ${queuePos + 1})`);
-                    //             }
-                    //             try {
-                    //                 const response = await gemini.askQuestion(question, message.username);
-                    //                 await sendMessage(driver, `@${message.username} ${response}`);
-                    //             } catch (error) {
-                    //                 console.error('Gemini error:', error.message);
-                    //                 await sendMessage(driver, `@${message.username} Sorry, I'm having trouble right now`);
-                    //             }
-                    //         }
-                    //     }
-                    // }
+                    else if (message.content.toLowerCase().includes(`@${BOT_NAME.toLowerCase()}`) || message.content.toLowerCase().includes(BOT_NAME.toLowerCase())) {
+                        if (grok && grok.isReady) {
+                            console.log(`Bot mentioned by ${message.username}: ${message.content}`);
+                            const question = message.content.replace(new RegExp(`@?u/?${BOT_NAME}`, 'gi'), '').trim();
+                            if (question) {
+                                const queuePos = grok.getQueueLength();
+                                if (queuePos > 0) {
+                                    await sendMessage(driver, `@${message.username} Question queued (position ${queuePos + 1})`);
+                                }
+                                try {
+                                    const response = await grok.askQuestion(question, message.username);
+                                    await sendMessage(driver, `@${message.username} ${response}`);
+                                } catch (error) {
+                                    console.error('Grok error:', error.message);
+                                    await sendMessage(driver, `@${message.username} Sorry, I'm having trouble right now`);
+                                }
+                            }
+                        }
+                    }
                     
                     const trackStatus = await db.getUserTrackStatus(message.username);
                     const visible = trackStatus === 1 ? 1 : 0;
@@ -127,6 +130,10 @@ async function monitorMessages(driver, db) {
 async function openReddit() {
     const db = new Database();
     await db.init();
+    
+    // Initialize Grok handler
+    grok = new GrokHandler();
+    await grok.init();
     
     console.log('Starting browser...');
     const userDataDir = path.join(__dirname, 'chrome-user-data');
@@ -179,7 +186,7 @@ async function openReddit() {
     loadProcessedMessages();
 
     console.log('Waiting for page to load...');
-    await new Promise(resolve => setTimeout(resolve, 10000));
+    await new Promise(resolve => setTimeout(resolve, 3000));
 
     const pageInfo = await driver.executeScript(`
         return {
