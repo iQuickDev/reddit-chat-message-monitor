@@ -79,12 +79,12 @@ app.get('/api/messages', async (req, res) => {
         
         if (startDate) {
             query += ' AND timestamp >= ?';
-            params.push(startDate);
+            params.push(startDate.replace('T', ' ') + ':00');
         }
         
         if (endDate) {
             query += ' AND timestamp <= ?';
-            params.push(endDate);
+            params.push(endDate.replace('T', ' ') + ':59');
         }
         
         query += ' ORDER BY timestamp DESC LIMIT 100';
@@ -150,6 +150,27 @@ app.get('/api/full-leaderboard', async (req, res) => {
         });
         
         res.json({ allUsers });
+        
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    } finally {
+        db.close();
+    }
+});
+
+app.get('/api/do-not-track', async (req, res) => {
+    const db = new Database();
+    try {
+        await db.init();
+        
+        const untrackedUsers = await new Promise((resolve, reject) => {
+            db.db.all('SELECT username FROM users WHERE track = 0 ORDER BY username', (err, rows) => {
+                if (err) reject(err);
+                else resolve(rows.map(row => row.username));
+            });
+        });
+        
+        res.json({ users: untrackedUsers });
         
     } catch (error) {
         res.status(500).json({ error: error.message });

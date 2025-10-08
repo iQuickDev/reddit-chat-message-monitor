@@ -8,6 +8,27 @@ const server = require('./server')
 dotenv.config();
 
 let processedMessages = new Set();
+const PROCESSED_MESSAGES_FILE = path.join(__dirname, 'state', 'processed-messages.json');
+
+function loadProcessedMessages() {
+    try {
+        if (fs.existsSync(PROCESSED_MESSAGES_FILE)) {
+            const data = JSON.parse(fs.readFileSync(PROCESSED_MESSAGES_FILE, 'utf8'));
+            processedMessages = new Set(data);
+            console.log(`Loaded ${processedMessages.size} processed messages`);
+        }
+    } catch (error) {
+        console.error('Error loading processed messages:', error.message);
+    }
+}
+
+function saveProcessedMessages() {
+    try {
+        fs.writeFileSync(PROCESSED_MESSAGES_FILE, JSON.stringify([...processedMessages]));
+    } catch (error) {
+        console.error('Error saving processed messages:', error.message);
+    }
+}
 
 async function sendMessage(driver, message) {
     driver.executeScript(`
@@ -57,7 +78,8 @@ async function monitorMessages(driver, db) {
 
             for (const message of messageList) {
                 if (!processedMessages.has(message.dataId)) {
-
+                    processedMessages.add(message.dataId);
+                    saveProcessedMessages();
                     if (message.content.toLowerCase() === '/dt') {
                         await db.setUserTrackStatus(message.username, 0);
                         console.log(`${message.username} disabled tracking`);
@@ -67,6 +89,25 @@ async function monitorMessages(driver, db) {
                         console.log(`${message.username} enabled tracking`);
                         await sendMessage(driver, `@${message.username} Tracking messaggi attivato`);
                     }
+                    // else if (message.content.toLowerCase().includes(`@${BOT_NAME.toLowerCase()}`) || message.content.toLowerCase().includes(BOT_NAME.toLowerCase())) {
+                    //     if (gemini && gemini.isReady) {
+                    //         console.log(`Bot mentioned by ${message.username}: ${message.content}`);
+                    //         const question = message.content.replace(new RegExp(`@?${BOT_NAME}`, 'gi'), '').trim();
+                    //         if (question) {
+                    //             const queuePos = gemini.getQueueLength();
+                    //             if (queuePos > 0) {
+                    //                 await sendMessage(driver, `@${message.username} Question queued (position ${queuePos + 1})`);
+                    //             }
+                    //             try {
+                    //                 const response = await gemini.askQuestion(question, message.username);
+                    //                 await sendMessage(driver, `@${message.username} ${response}`);
+                    //             } catch (error) {
+                    //                 console.error('Gemini error:', error.message);
+                    //                 await sendMessage(driver, `@${message.username} Sorry, I'm having trouble right now`);
+                    //             }
+                    //         }
+                    //     }
+                    // }
                     
                     const trackStatus = await db.getUserTrackStatus(message.username);
                     const visible = trackStatus === 1 ? 1 : 0;
@@ -75,7 +116,6 @@ async function monitorMessages(driver, db) {
                         await db.updateUserStats(message.username);
                         console.log(`${message.username}: ${message.content}`);
                     }
-                    processedMessages.add(message.dataId);
                 }
             }
         } catch (error) {
@@ -135,6 +175,8 @@ async function openReddit() {
     if (!fs.existsSync(stateDir)) {
         fs.mkdirSync(stateDir);
     }
+    
+    loadProcessedMessages();
 
     console.log('Waiting for page to load...');
     await new Promise(resolve => setTimeout(resolve, 10000));
