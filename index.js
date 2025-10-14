@@ -1,150 +1,44 @@
-const { Builder, until, By } = require('selenium-webdriver');
+const { Builder, By } = require('selenium-webdriver');
 const chrome = require('selenium-webdriver/chrome');
 const Database = require('./database');
 const fs = require('fs');
 const path = require('path');
-const express = require('express');
 const dotenv = require('dotenv')
+const server = require('./server')
 dotenv.config();
 
 let processedMessages = new Set();
+const PROCESSED_MESSAGES_FILE = path.join(__dirname, 'state', 'processed-messages.json');
 
-// Start web server
-function startServer() {
-    const app = express();
-    app.use(express.static('public'));
-    
-    app.get('/api/stats', async (req, res) => {
-        const db = new Database();
-        try {
-            await db.init();
-            
-            const totalMessages = await db.getMessageCount();
-            const topUsers = await db.getTopUsers(20);
-            
-            const hourlyStats = await new Promise((resolve, reject) => {
-                db.db.all(`
-                    SELECT 
-                        strftime('%Y-%m-%d %H:', timestamp) || 
-                        CASE WHEN CAST(strftime('%M', timestamp) AS INTEGER) < 30 THEN '00' ELSE '30' END || ':00' as hour,
-                        COUNT(*) as count
-                    FROM messages 
-                    WHERE timestamp >= datetime('now', '-24 hours')
-                    GROUP BY hour
-                    ORDER BY hour
-                `, (err, rows) => {
-                    if (err) reject(err);
-                    else resolve(rows);
-                });
-            });
-            
-            res.json({ totalMessages, topUsers, hourlyStats });
-            
-        } catch (error) {
-            res.status(500).json({ error: error.message });
-        } finally {
-            db.close();
+function loadProcessedMessages() {
+    try {
+        if (fs.existsSync(PROCESSED_MESSAGES_FILE)) {
+            const data = JSON.parse(fs.readFileSync(PROCESSED_MESSAGES_FILE, 'utf8'));
+            processedMessages = new Set(data);
+            console.log(`Loaded ${processedMessages.size} processed messages`);
         }
-    });
-    
-    app.get('/api/full-leaderboard', async (req, res) => {
-        const db = new Database();
-        try {
-            await db.init();
-            const allUsers = await db.getTopUsers(1000);
-            res.json({ allUsers });
-        } catch (error) {
-            res.status(500).json({ error: error.message });
-        } finally {
-            db.close();
-        }
-    });
-    
-    app.get('/api/overall-stats', async (req, res) => {
-        const db = new Database();
-        try {
-            await db.init();
-            
-            const overallStats = await new Promise((resolve, reject) => {
-                db.db.all(`
-                    SELECT 
-                        DATE(timestamp) as date,
-                        COUNT(*) as daily_count,
-                        SUM(COUNT(*)) OVER (ORDER BY DATE(timestamp)) as cumulative_count
-                    FROM messages 
-                    GROUP BY DATE(timestamp)
-                    ORDER BY date
-                `, (err, rows) => {
-                    if (err) reject(err);
-                    else resolve(rows);
-                });
-            });
-            
-            res.json({ overallStats });
-        } catch (error) {
-            res.status(500).json({ error: error.message });
-        } finally {
-            db.close();
-        }
-    });
-    
-    app.get('/api/messages', async (req, res) => {
-        const db = new Database();
-        try {
-            await db.init();
-            
-            let { text, user, startDate, endDate, limit = 100 } = req.query;
-            
-            // Input validation
-            if (text && typeof text !== 'string') text = '';
-            if (user && typeof user !== 'string') user = '';
-            if (text) text = text.substring(0, 500); // Limit length
-            if (user) user = user.substring(0, 100); // Limit length
-            
-            const parsedLimit = Math.min(Math.max(parseInt(limit) || 100, 1), 1000);
-            
-            let query = 'SELECT message_id, username, message, timestamp FROM messages WHERE 1=1';
-            const params = [];
-            
-            if (text && text.trim()) {
-                query += ' AND message LIKE ?';
-                params.push(`%${text.trim()}%`);
-            }
-            if (user && user.trim()) {
-                query += ' AND username LIKE ?';
-                params.push(`%${user.trim()}%`);
-            }
-            if (startDate) {
-                query += ' AND timestamp >= ?';
-                params.push(startDate);
-            }
-            if (endDate) {
-                query += ' AND timestamp <= ?';
-                params.push(endDate);
-            }
-            
-            query += ' ORDER BY timestamp DESC LIMIT ?';
-            params.push(parsedLimit);
-            
-            const messages = await new Promise((resolve, reject) => {
-                db.db.all(query, params, (err, rows) => {
-                    if (err) reject(err);
-                    else resolve(rows);
-                });
-            });
-            
-            res.json({ messages });
-        } catch (error) {
-            res.status(500).json({ error: error.message });
-        } finally {
-            db.close();
-        }
-    });
-    
-    app.listen(4438, () => {
-        console.log('Dashboard server running on http://localhost:4438');
-    });
+    } catch (error) {
+        console.error('Error loading processed messages:', error.message);
+    }
 }
+
+function saveProcessedMessages() {
+    try {
+        fs.writeFileSync(PROCESSED_MESSAGES_FILE, JSON.stringify([...processedMessages]));
+    } catch (error) {
+        console.error('Error saving processed messages:', error.message);
+    }
+}
+
+async function sendMessage(driver, message) {
+    driver.executeScript(`
+        const textarea = document.querySelector("body > faceplate-app > rs-app").shadowRoot.querySelector("div.rs-app-container > div > rs-page-overlay-manager > rs-room").shadowRoot.querySelector("main > rs-message-composer").shadowRoot.querySelector("div > form > div.message-box").querySelector("textarea");
+        const sendButton = document.querySelector("body > faceplate-app > rs-app").shadowRoot.querySelector("div.rs-app-container > div > rs-page-overlay-manager > rs-room").shadowRoot.querySelector("main > rs-message-composer").shadowRoot.querySelector("div > form > div.flex.gap-2xs.py-2xs > faceplate-tooltip.ml-auto > button");
+        textarea.value = "${message}";
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        setTimeout(() => sendButton.click(), 1000);
+    `)
+    }
 
 async function monitorMessages(driver, db) {
     console.log('Starting message monitoring...');
@@ -169,13 +63,11 @@ async function monitorMessages(driver, db) {
                 const virtualScrollShadow = virtualScroll.shadowRoot;
                 if (!virtualScrollShadow) return { debug: 'No virtual scroll shadow', messages: [] };
                 const events = virtualScrollShadow.querySelectorAll("rs-timeline-event");
-                console.log('Timeline events found:', events.length);
                 
                 const messages = Array.from(events).map(event => {
-                    const username = event.shadowRoot.querySelector('.room-message').getAttribute('aria-label').split(' ')[0]
+                    const username = event.shadowRoot.querySelector('.room-message')?.getAttribute('aria-label').split(' ')[0]
                     const dataId = event.getAttribute('data-id');
                     const content = event.shadowRoot?.querySelector('.room-message-text')?.textContent?.trim();
-                    console.log(dataId, username, content)
                     return { dataId, username, content };
                 }).filter(msg => msg.dataId && msg.username && msg.content);
                 
@@ -186,12 +78,44 @@ async function monitorMessages(driver, db) {
 
             for (const message of messageList) {
                 if (!processedMessages.has(message.dataId)) {
-                    const inserted = await db.insertMessage(message.dataId, message.username, message.content);
+                    processedMessages.add(message.dataId);
+                    saveProcessedMessages();
+                    if (message.content.toLowerCase() === '/dt') {
+                        await db.setUserTrackStatus(message.username, 0);
+                        console.log(`${message.username} disabled tracking`);
+                        await sendMessage(driver, `@${message.username} Tracking messaggi disattivato`);
+                    } else if (message.content.toLowerCase() === '/at') {
+                        await db.setUserTrackStatus(message.username, 1);
+                        console.log(`${message.username} enabled tracking`);
+                        await sendMessage(driver, `@${message.username} Tracking messaggi attivato`);
+                    }
+                    // else if (message.content.toLowerCase().includes(`@${BOT_NAME.toLowerCase()}`) || message.content.toLowerCase().includes(BOT_NAME.toLowerCase())) {
+                    //     if (gemini && gemini.isReady) {
+                    //         console.log(`Bot mentioned by ${message.username}: ${message.content}`);
+                    //         const question = message.content.replace(new RegExp(`@?${BOT_NAME}`, 'gi'), '').trim();
+                    //         if (question) {
+                    //             const queuePos = gemini.getQueueLength();
+                    //             if (queuePos > 0) {
+                    //                 await sendMessage(driver, `@${message.username} Question queued (position ${queuePos + 1})`);
+                    //             }
+                    //             try {
+                    //                 const response = await gemini.askQuestion(question, message.username);
+                    //                 await sendMessage(driver, `@${message.username} ${response}`);
+                    //             } catch (error) {
+                    //                 console.error('Gemini error:', error.message);
+                    //                 await sendMessage(driver, `@${message.username} Sorry, I'm having trouble right now`);
+                    //             }
+                    //         }
+                    //     }
+                    // }
+                    
+                    const trackStatus = await db.getUserTrackStatus(message.username);
+                    const visible = trackStatus === 1 ? 1 : 0;
+                    const inserted = await db.insertMessage(message.dataId, message.username, message.content, visible);
                     if (inserted) {
                         await db.updateUserStats(message.username);
                         console.log(`${message.username}: ${message.content}`);
                     }
-                    processedMessages.add(message.dataId);
                 }
             }
         } catch (error) {
@@ -235,7 +159,7 @@ async function openReddit() {
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     console.log('Browser ready, attempting navigation...');
-    const url = 'https://chat.reddit.com/room/!7H3QfsLhRXalKvwGiIDjrw%3Areddit.com';
+    const url = process.env.CHAT_LINK;
     
     try {
         console.log('Using driver.get()...');
@@ -251,6 +175,8 @@ async function openReddit() {
     if (!fs.existsSync(stateDir)) {
         fs.mkdirSync(stateDir);
     }
+    
+    loadProcessedMessages();
 
     console.log('Waiting for page to load...');
     await new Promise(resolve => setTimeout(resolve, 10000));
@@ -286,8 +212,6 @@ async function openReddit() {
     // db.close();
 }
 
-// Start both server and monitoring
-startServer();
 openReddit().catch(err => {
     console.error('Error:', err.message);
     process.exit(1);

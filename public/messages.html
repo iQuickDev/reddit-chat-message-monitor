@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Messages - r/Italia Dashboard</title>
     <style>
         body {
@@ -104,6 +105,50 @@
             color: #e0e0e0;
             margin-top: 0;
         }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            
+            .container {
+                max-width: 100%;
+            }
+            
+            .search-panel {
+                padding: 15px;
+                margin: 10px 0;
+            }
+            
+            .search-row {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .search-input {
+                min-width: auto;
+                width: 100%;
+            }
+            
+            .messages-table {
+                padding: 10px;
+                margin: 10px 0;
+            }
+            
+            table {
+                font-size: 0.9em;
+            }
+            
+            th, td {
+                padding: 8px 4px;
+                word-break: break-word;
+            }
+            
+            h1 {
+                font-size: 1.5em;
+                margin-bottom: 20px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -160,7 +205,15 @@
             const tbody = document.getElementById('messagesBody');
             tbody.innerHTML = data.messages.map(msg => 
                 `<tr>
-                    <td>${new Date(msg.timestamp).toLocaleString()}</td>
+                    <td>${new Date(msg.timestamp).toLocaleString('it-IT', {
+                        timeZone: 'Europe/Rome',
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit'
+                    })}</td>
                     <td>${msg.username}</td>
                     <td>${msg.message}</td>
                 </tr>`
