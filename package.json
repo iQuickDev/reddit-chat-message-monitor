@@ -6,7 +6,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "test-db": "node test-db.js",
     "stats": "node stats.js",
-    "server": "node server.js"
+    "server": "node server.js",
+    "dump": "node dump-chat.js"
   },
   "keywords": [],
   "author": "",

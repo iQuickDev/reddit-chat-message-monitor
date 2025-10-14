@@ -160,8 +160,8 @@
                     data: {
                         labels: overallData.overallStats.map(s => new Date(s.date).toLocaleDateString()),
                         datasets: [{
-                            label: 'Total Messages',
-                            data: overallData.overallStats.map(s => s.cumulative_count),
+                            label: 'Daily Messages',
+                            data: overallData.overallStats.map(s => s.daily_count),
                             borderColor: 'rgba(76, 175, 80, 1)',
                             backgroundColor: gradient0,
                             fill: true,
@@ -176,7 +176,7 @@
                     options: {
                         responsive: true,
                         plugins: {
-                            title: { display: true, text: '📈 Overall Messages Growth', font: { size: 18 }, color: '#e0e0e0' },
+                            title: { display: true, text: '📈 Daily Messages Activity', font: { size: 18 }, color: '#e0e0e0' },
                             legend: { display: false }
                         },
                         scales: {
